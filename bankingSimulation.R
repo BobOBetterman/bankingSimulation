@@ -1,9 +1,11 @@
+setwd("D:/programming/personal/bankingSimulation/")
+
 deck=matrix(c(rep( c(2:10,"J","Q","K","A"),4),rep(c("C","D","H","S"),rep(13,4))), ncol=2,dimnames=list(NULL,c("rank","suit")))
 
 # Eight players is the max number that can sit at a table
 numPlay = 8
 numBank = 2
-stackSize = 10000
+stackSize = 100000
 minBet = 5
 #averageBet = 5
 anteBet = 5
@@ -12,13 +14,15 @@ sixCardBonusBet = 5
 anteFee = 1
 sixCardBonusFee = 1
 bankerFee = 3
-# Assuming ten hours a weekend and thirty hands an hour for three months, this is the approximate number of hands
-numHands = 3500
+maxSeatPayout = 30000
+maxTablePayout = 100000
+# Assuming ten hours a weekend and thirty hands an hour for three months, this is the approximate number of hands: 4000
+numHands = 1000
 
 playerPairPayout = c(-1, 1, 3, 6, 30, 40, 200)
 sixCardBonusPayout = c(-1, 7, 10, 15, 20, 100, 200, 1000)
 
-numTrials = 1000
+numTrials = 10000
 
 deal_hand = function()
 {
@@ -45,8 +49,12 @@ what_hand = function(hand)
         }
 # 6 = Straight Flush      
         else {
-          if(all( rank_i_ah-min(rank_i_ah)+1 == 1:3 )) highCardStraight = max(rank_i_ah)
-          else highCardStraight = max(rank_i_al) - 1
+          if(all( rank_i_ah-min(rank_i_ah)+1 == 1:3 )) {
+            highCardStraight = max(rank_i_ah)
+          }
+          else {
+            highCardStraight = max(rank_i_al) - 1
+          }
           handRank = c(6, highCardStraight)
           return(handRank)
         }
@@ -54,8 +62,12 @@ what_hand = function(hand)
     
 # 4 = Straight    
     if (is_straight){
-      if(all( rank_i_ah-min(rank_i_ah)+1 == 1:3 )) highCardStraight = max(rank_i_ah)
-      else highCardStraight = max(rank_i_al) - 1
+      if(all( rank_i_ah-min(rank_i_ah)+1 == 1:3 )) {
+        highCardStraight = max(rank_i_ah)
+      }
+      else {
+        highCardStraight = max(rank_i_al) - 1
+      }
       handRank = c(4, highCardStraight)
       return(handRank)
     } 
@@ -243,11 +255,15 @@ bankRound = function(bankPayoutRound) {
     
     baseWagerPayout = playerHand(allHands, handRanks, handRanks[j, ], anteBet, j)
     
-    if(baseWagerPayout == -5) {
+    if(baseWagerPayout == -anteBet) {
       sixCardRank = 1
     }
     
     bankPayoutRound[j - 1] = -baseWagerPayout - playerPairPayout[handRanks[j, 1]] * playerPairBet - sixCardBonusPayout[sixCardRank] * sixCardBonusBet
+    
+    if(bankPayoutRound[j - 1] < -maxSeatPayout) {
+      bankPayoutRound[j - 1] = -maxSeatPayout
+      }
   }
   
   return(bankPayoutRound)
@@ -269,7 +285,13 @@ simulateSession = function(numHands) {
     if(whoIsBank[i] == 2) {
       bankPayoutRound = bankRound(bankPayoutRound)
       
-      newStackSize[i+1] = newStackSize[i] + sum(bankPayoutRound) - bankerFee
+      totalBankRoundPayout = sum(bankPayoutRound)
+      
+      if(totalBankRoundPayout < -maxTablePayout) {
+        totalBankRoundPayout = -maxTablePayout
+        }
+      
+      newStackSize[i+1] = newStackSize[i] + totalBankRoundPayout - bankerFee
     }
   }
 
@@ -384,12 +406,69 @@ whatHandSixCard = function(hand)
 }
 
 sessionStats = matrix(nrow = numTrials, ncol = 2, dimnames = list(NULL, c("finalStackSize", "lowestStackSize")))
+allStacks = matrix(nrow = (numHands+1), ncol = numTrials)
 
 for(i in 1:numTrials) {
   finalStack = simulateSession(numHands)
   
-  sessionStats[i, ] = c(finalStack[numHands], min(finalStack))
+  allStacks [ , i] = finalStack
+  sessionStats[i, ] = c(finalStack[(numHands+1)], min(finalStack))
 }
 
+
+# This code block is for testing the behavior of each bet individually, all in one run of the code.
+# The same results can be achieved with the main program by changing the betting amounts, but this version
+# let me check each individual bet at once.
+
+# sessionStatsAnteBet = matrix(nrow = numTrials, ncol = 2, dimnames = list(NULL, c("finalStackSizeAnte", "lowestStackSizeAnte")))
+# sessionStatsPairBet = matrix(nrow = numTrials, ncol = 2, dimnames = list(NULL, c("finalStackSizePair", "lowestStackSizePair")))
+# sessionStatsSixBet = matrix(nrow = numTrials, ncol = 2, dimnames = list(NULL, c("finalStackSizeSix", "lowestStackSizeSix")))
+# 
+# for(i in 1:numTrials) {
+#   anteBet = 5
+#   playerPairBet = 0
+#   sixCardBonusBet = 0
+#   
+#   finalStack = simulateSession(numHands)
+#   
+#   sessionStatsAnteBet[i, ] = c(finalStack[numHands], min(finalStack))
+# }
+# 
+# for(i in 1:numTrials) {
+#   anteBet = 0
+#   playerPairBet = 5
+#   sixCardBonusBet = 0
+#   
+#   finalStack = simulateSession(numHands)
+#   
+#   sessionStatsPairBet[i, ] = c(finalStack[numHands], min(finalStack))
+# }
+# 
+# for(i in 1:numTrials) {
+#   anteBet = 0
+#   playerPairBet = 0
+#   sixCardBonusBet = 5
+#   
+#   finalStack = simulateSession(numHands)
+#   
+#   sessionStatsSixBet[i, ] = c(finalStack[numHands], min(finalStack))
+# }
+
+
+
+#This is for visualisation purposes. A handy way to save typing a couple lines of code.
+
 #plot(finalStack)
-#print(min(finalStack))
+#summary(sessionStats)
+
+# This is for establishing the size of the stack to use--I want a one percent chance, but ran the simulation
+# 1000 times for more reliability.
+
+# ses20 <- read.csv("data/sessionStats75000Stack20Bet1000Hands1000Trials.csv")
+# for(i in 1:10) {avgMinSize[i] <- min(ses20[(100*(i-1) + 1):(100*i), 3])}
+# summary(avgMinSize)
+# (75000-49570) + 15000
+# for(i in 1:10) {avgFinSize[i] <- mean(ses20[(100*(i-1) + 1):(100*i), 2])}
+# summary(avgFinSize)
+# ((88250 - 75000) / 1000) * 35
+
